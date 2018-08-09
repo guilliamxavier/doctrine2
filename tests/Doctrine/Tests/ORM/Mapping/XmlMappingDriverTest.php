@@ -189,7 +189,7 @@ class XmlMappingDriverTest extends AbstractMappingDriverTest
      * @dataProvider dataValidSchemaInvalidMappings
      * @group 6389
      */
-    public function testValidateXmlSchemaWithInvalidMapping($xmlMappingFile, $errorMessageRegexes) : void
+    public function testValidateXmlSchemaWithInvalidMapping(string $xmlMappingFile, array $errorMessageRegexes) : void
     {
         $savedUseErrors = libxml_use_internal_errors(true);
         libxml_clear_errors();
@@ -213,11 +213,7 @@ class XmlMappingDriverTest extends AbstractMappingDriverTest
         }
     }
 
-    /**
-     * @param string $xmlMappingFile
-     * @return bool
-     */
-    private function doValidateXmlSchema($xmlMappingFile) : bool
+    private function doValidateXmlSchema(string $xmlMappingFile) : bool
     {
         $xsdSchemaFile = __DIR__ . '/../../../../../doctrine-mapping.xsd';
         $dom           = new \DOMDocument('1.0', 'UTF-8');
@@ -232,7 +228,7 @@ class XmlMappingDriverTest extends AbstractMappingDriverTest
         $list    = self::getAllXmlMappingPaths();
         $invalid = self::getInvalidXmlMappingMap();
 
-        $list = array_filter($list, function ($filename) use ($invalid) {
+        $list = array_filter($list, function (string $filename) use ($invalid) : bool {
             $matchesInvalid = false;
             foreach ($invalid as $filenamePattern => $unused) {
                 if (fnmatch($filenamePattern, $filename)) {
@@ -244,7 +240,7 @@ class XmlMappingDriverTest extends AbstractMappingDriverTest
             return ! $matchesInvalid;
         }, ARRAY_FILTER_USE_KEY);
 
-        return array_map(function ($item) {
+        return array_map(function (string $item) : array {
             return [$item];
         }, $list);
     }
@@ -256,7 +252,7 @@ class XmlMappingDriverTest extends AbstractMappingDriverTest
 
         $map = [];
         foreach ($invalid as $filenamePattern => $errorMessageRegexes) {
-            $foundItems = array_filter($list, function ($filename) use ($filenamePattern) {
+            $foundItems = array_filter($list, function (string $filename) use ($filenamePattern) : bool {
                 return fnmatch($filenamePattern, $filename);
             }, ARRAY_FILTER_USE_KEY);
 
@@ -290,7 +286,7 @@ class XmlMappingDriverTest extends AbstractMappingDriverTest
      */
     private static function getInvalidXmlMappingMap() : array
     {
-        $namespaced = function ($name) {
+        $namespaced = function (string $name) : string {
             return sprintf('{%s}%s', 'http://doctrine-project.org/schemas/orm/doctrine-mapping', $name);
         };
 
@@ -313,8 +309,8 @@ class XmlMappingDriverTest extends AbstractMappingDriverTest
         }
 
         // Convert basic sprintf-style formats to PCRE patterns
-        return array_map(function ($errorMessageFormats) {
-            return array_map(function ($errorMessageFormat) {
+        return array_map(function (array $errorMessageFormats) : array {
+            return array_map(function (string $errorMessageFormat) : string {
                 return '/^' . strtr(preg_quote($errorMessageFormat, '/'), [
                         '%%' => '%',
                         '%s' => '.*',
