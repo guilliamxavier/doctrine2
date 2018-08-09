@@ -4,6 +4,26 @@
       xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
                           http://doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
 
+    <entity name="PatternTablenameValidContainsSpace"
+            table="foo bar">
+    </entity>
+
+    <entity name="PatternTablenameValidContainsHyphen"
+            table="foo-bar">
+    </entity>
+
+    <entity name="PatternTablenameValidContainsSlash"
+            table="foo/bar">
+    </entity>
+
+    <entity name="PatternTablenameValidContainsSemicolon"
+            table="foo;bar">
+    </entity>
+
+    <entity name="PatternTablenameValidContainsCircumflex"
+            table="foo^bar">
+    </entity>
+
     <entity name="PatternTablenameValidContainsTilde"
             table="foo~bar">
     </entity>
