@@ -14,10 +14,10 @@ use Doctrine\Tests\Models\DDC889\DDC889Class;
 use Doctrine\Tests\Models\Generic\SerializationModel;
 use Doctrine\Tests\Models\ValueObjects\Name;
 use Doctrine\Tests\Models\ValueObjects\Person;
+use const ARRAY_FILTER_USE_KEY;
 use const DIRECTORY_SEPARATOR;
 use const PATHINFO_FILENAME;
 use function array_filter;
-use function array_keys;
 use function array_map;
 use function count;
 use function fnmatch;
@@ -232,17 +232,17 @@ class XmlMappingDriverTest extends AbstractMappingDriverTest
         $list    = self::getAllXmlMappingPaths();
         $invalid = self::getInvalidXmlMappingMap();
 
-        $list = array_filter($list, function ($item) use ($invalid) {
+        $list = array_filter($list, function ($filename) use ($invalid) {
             $matchesInvalid = false;
             foreach ($invalid as $filenamePattern => $unused) {
-                if (fnmatch($filenamePattern, pathinfo($item, PATHINFO_FILENAME))) {
+                if (fnmatch($filenamePattern, $filename)) {
                     $matchesInvalid = true;
                     break;
                 }
             }
 
             return ! $matchesInvalid;
-        });
+        }, ARRAY_FILTER_USE_KEY);
 
         return array_map(function ($item) {
             return [$item];
@@ -256,30 +256,33 @@ class XmlMappingDriverTest extends AbstractMappingDriverTest
 
         $map = [];
         foreach ($invalid as $filenamePattern => $errorMessageRegexes) {
-            $foundItems = array_filter($list, function ($item) use ($filenamePattern) {
-                return fnmatch($filenamePattern, pathinfo($item, PATHINFO_FILENAME));
-            });
+            $foundItems = array_filter($list, function ($filename) use ($filenamePattern) {
+                return fnmatch($filenamePattern, $filename);
+            }, ARRAY_FILTER_USE_KEY);
 
             if (count($foundItems) > 0) {
-                foreach ($foundItems as $foundItem) {
-                    $map[$foundItem] = $errorMessageRegexes;
+                foreach ($foundItems as $filename => $foundItem) {
+                    $map[$filename] = [$foundItem, $errorMessageRegexes];
                 }
             } else {
                 throw new \RuntimeException(sprintf('Found no XML mapping with filename pattern "%s".', $filenamePattern));
             }
         }
 
-        return array_map(function ($item, $errorMessageRegexes) {
-            return [$item, $errorMessageRegexes];
-        }, array_keys($map), $map);
+        return $map;
     }
 
     /**
-     * @return string[]
+     * @return array<string, string> ($filename => $path)
      */
     private static function getAllXmlMappingPaths() : array
     {
-        return glob(__DIR__ . '/xml/*.xml');
+        $list = [];
+        foreach (glob(__DIR__ . '/xml/*.xml') as $path) {
+            $list[pathinfo($path, PATHINFO_FILENAME)] = $path;
+        }
+
+        return $list;
     }
 
     /**
