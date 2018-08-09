@@ -17,10 +17,10 @@ use Doctrine\Tests\Models\ValueObjects\Person;
 use const DIRECTORY_SEPARATOR;
 use const PATHINFO_FILENAME;
 use function array_filter;
-use function array_key_exists;
 use function array_keys;
 use function array_map;
 use function count;
+use function fnmatch;
 use function glob;
 use function iterator_to_array;
 use function libxml_clear_errors;
@@ -233,7 +233,15 @@ class XmlMappingDriverTest extends AbstractMappingDriverTest
         $invalid = self::getInvalidXmlMappingMap();
 
         $list = array_filter($list, function ($item) use ($invalid) {
-            return ! array_key_exists(pathinfo($item, PATHINFO_FILENAME), $invalid);
+            $matchesInvalid = false;
+            foreach ($invalid as $filenamePattern => $unused) {
+                if (fnmatch($filenamePattern, pathinfo($item, PATHINFO_FILENAME))) {
+                    $matchesInvalid = true;
+                    break;
+                }
+            }
+
+            return ! $matchesInvalid;
         });
 
         return array_map(function ($item) {
@@ -247,19 +255,17 @@ class XmlMappingDriverTest extends AbstractMappingDriverTest
         $invalid = self::getInvalidXmlMappingMap();
 
         $map = [];
-        foreach ($invalid as $filename => $errorMessageRegexes) {
-            $foundItem = null;
-            foreach ($list as $item) {
-                if (pathinfo($item, PATHINFO_FILENAME) === $filename) {
-                    $foundItem = $item;
-                    break;
-                }
-            }
+        foreach ($invalid as $filenamePattern => $errorMessageRegexes) {
+            $foundItems = array_filter($list, function ($item) use ($filenamePattern) {
+                return fnmatch($filenamePattern, pathinfo($item, PATHINFO_FILENAME));
+            });
 
-            if ($foundItem !== null) {
-                $map[$foundItem] = $errorMessageRegexes;
+            if (count($foundItems) > 0) {
+                foreach ($foundItems as $foundItem) {
+                    $map[$foundItem] = $errorMessageRegexes;
+                }
             } else {
-                throw new \RuntimeException(sprintf('Found no XML mapping with filename "%s".', $filename));
+                throw new \RuntimeException(sprintf('Found no XML mapping with filename pattern "%s".', $filenamePattern));
             }
         }
 
@@ -277,15 +283,30 @@ class XmlMappingDriverTest extends AbstractMappingDriverTest
     }
 
     /**
-     * @return array<string, string[]> ($filename => $errorMessageRegexes)
+     * @return array<string, string[]> ($filenamePattern => $errorMessageRegexes)
      */
     private static function getInvalidXmlMappingMap() : array
     {
+        $namespaced = function ($name) {
+            return sprintf('{%s}%s', 'http://doctrine-project.org/schemas/orm/doctrine-mapping', $name);
+        };
+
         $invalid = [
             'Doctrine.Tests.Models.DDC889.DDC889Class.dcm' => [
-                "Element '{http://doctrine-project.org/schemas/orm/doctrine-mapping}class': This element is not expected.",
+                sprintf("Element '%s': This element is not expected.", $namespaced('class')),
             ],
         ];
+
+        foreach ([
+            'fqcn' => ['custom-id-generator', 'class'],
+        ] as $type => [$element, $attribute]) {
+            $errorMessagePrefix = sprintf("Element '%s', attribute '%s': ", $namespaced($element), $attribute);
+
+            $invalid[sprintf('pattern-%s-invalid-*', $type)] = [
+                $errorMessagePrefix . "[facet 'pattern'] The value '%s' is not accepted by the pattern '%s'.",
+                $errorMessagePrefix . sprintf("'%%s' is not a valid value of the atomic type '%s'.", $namespaced($type)),
+            ];
+        }
 
         // Convert basic sprintf-style formats to PCRE patterns
         return array_map(function ($errorMessageFormats) {
